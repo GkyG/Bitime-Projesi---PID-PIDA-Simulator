@@ -3,7 +3,8 @@ matplotlib.use('Agg')
 import numpy as np
 import matplotlib.pyplot as plt
 from control.timeresp import step_info
-from control import tf, step_response, bode, margin, poles, zeros, nyquist, nichols, rlocus
+from control import tf, step_response, bode, margin, zeros, nyquist, nichols, rlocus
+from control.matlab import poles
 import control as ctrl
 import io
 import base64
