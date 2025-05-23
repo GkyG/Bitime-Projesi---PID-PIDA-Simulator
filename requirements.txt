@@ -1,5 +1,5 @@
-flask
-matplotlib
-numpy
-control
-gunicorn
+Flask==2.1.2
+matplotlib==3.9.2
+numpy==2.1.2
+control==0.10.1
+gunicorn==23.0.0
