@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PID/PIDA Controller Simulator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-panel { background: #f9f9f9; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ddd; }
+        .plot-container { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
+        .plot { flex: 1; min-width: 300px; border: 1px solid #ddd; padding: 15px; background: white; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 15px; cursor: pointer; margin-right: 10px; border-radius: 4px; font-weight: bold; }
+        button:hover { background: #45a049; }
+        .comparison-controls { margin-top: 15px; background: #f0f0f0; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+        .controller-compare { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .controller-params { flex: 1; min-width: 250px; background: #e9e9e9; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+        .tab-buttons { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .tab-buttons button { background: #ddd; color: #333; border: 1px solid #ccc; border-bottom: none; margin-bottom: -1px; position: relative; z-index: 1; }
+        .tab-buttons button:hover { background: #eee; }
+        .tab-buttons button.active { background: white; border-bottom: 1px solid white; z-index: 2; font-weight: bold; }
+        .tab-content { display: none; padding: 15px; border: 1px solid #ddd; background: white; border-radius: 0 5px 5px 5px; }
+        .tab-content.active { display: block; }
+        .error { color: red; margin-top: 10px; padding: 10px; background: #ffeeee; border-radius: 4px; }
+        .performance-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .performance-table th, .performance-table td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+        .performance-table th { background-color: #f2f2f2; }
+        .performance-table tr:nth-child(even) { background-color: #f9f9f9; }
+        .disabled-params { opacity: 0.5;  pointer-events: none; }
+        .disabled-fields { opacity: 0.5;  pointer-events: none; }
+        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        h2 { text-align: center; margin-bottom: 20px; color: #333; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>PID/PIDA Controller Simulator</h1>
+         <div style="text-align: center;">
+    <img src="{{ url_for('static', filename='Gokay.png') }}" alt="Block Diagram" style="max-width: 550px; margin-bottom: 20px;">
+</div>
+
+
+        <div class="form-panel">
+            <form method="POST" id="main-form">
+                <div class="form-group">
+                    <label>Controller Type:</label>
+                    <select name="controller_type" id="controller_type">
+                        <option value="PID" {{ 'selected' if values.controller_type == "PID" else '' }}>PID</option>
+                        <option value="PIDA" {{ 'selected' if values.controller_type == "PIDA" else '' }}>PIDA</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Gp(s) Numerator:</label>
+                    <input type="text" name="num" value="{{ values.num }}" placeholder="e.g., 1 or 9.944·10^10 6.271·10^12 4.555·10^13">
+                </div>
+
+                <div class="form-group">
+                    <label>Gp(s) Denominator:</label>
+                    <input type="text" name="den" value="{{ values.den }}" placeholder="e.g., 1 1 or 9.344·10^8 3.838·10^10 1.949·10^12">
+                </div>
+
+                <div class="form-group">
+                    <label>H(s) Numerator:</label>
+                    <input type="text" name="h_num" value="{{ values.h_num }}" placeholder="e.g., 1">
+                </div>
+
+                <div class="form-group">
+                    <label>H(s) Denominator:</label>
+                    <input type="text" name="h_den" value="{{ values.h_den }}" placeholder="e.g., 1">
+                </div>
+
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Kp:</label>
+                        <input type="number" step="0.0001" name="kp" value="{{ values.kp }}">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ki:</label>
+                        <input type="number" step="0.0001" name="ki" value="{{ values.ki }}">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Kd:</label>
+                        <input type="number" step="0.0001" name="kd" value="{{ values.kd }}">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ka (PIDA only):</label>
+                        <input type="number" step="0.0001" name="ka" id="ka_input" value="{{ values.ka }}" {{ 'disabled' if values.controller_type == "PID" else '' }}>
+                    </div>
+                </div>
+
+                <button type="submit" name="action" value="analyze">Analyze</button>
+                <button type="button" id="compare-btn">Compare Analyze</button>
+
+                {% if error %}
+                <div class="error">{{ error }}</div>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="tab-buttons">
+            <button onclick="showTab('step')" id="step-tab-btn">Step Response</button>
+            <button onclick="showTab('bode')" id="bode-tab-btn">Bode Diagram</button>
+            <button onclick="showTab('pole_zero')" id="pole_zero-tab-btn">Pole-Zero Map</button>
+            <button onclick="showTab('root_locus')" id="root_locus-tab-btn">Root Locus</button>
+            <button onclick="showTab('nyquist')" id="nyquist-tab-btn">Nyquist Diagram</button>
+            <button onclick="showTab('nichols')" id="nichols-tab-btn">Nichols Chart</button>
+            <button onclick="showTab('comparison')" id="comparison-tab-btn">Controller Comparison</button>
+        </div>
+
+        <div class="tab-content active" id="step-tab">
+            <div class="plot">
+                <h2>Step Response</h2>
+                {% if plots.step %}
+                <img src="data:image/png;base64,{{ plots.step }}" style="width: 100%;">
+                {% else %}
+                <p>No step response data available. Run an analysis first.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-content" id="bode-tab">
+            <div class="plot">
+                <h2>Bode Diagram</h2>
+                {% if plots.bode %}
+                <img src="data:image/png;base64,{{ plots.bode }}" style="width: 100%;">
+                {% else %}
+                <p>No Bode diagram data available. Run an analysis first.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-content" id="pole_zero-tab">
+            <div class="plot">
+                <h2>Pole-Zero Map</h2>
+                {% if plots.pole_zero %}
+                <img src="data:image/png;base64,{{ plots.pole_zero }}" style="width: 100%;">
+                {% else %}
+                <p>No pole-zero map data available. Run an analysis first.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-content" id="root_locus-tab">
+            <div class="plot">
+                <h2>Root Locus</h2>
+                {% if plots.root_locus %}
+                <img src="data:image/png;base64,{{ plots.root_locus }}" style="width: 100%;">
+                {% else %}
+                <p>No root locus data available. Run an analysis first.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-content" id="nyquist-tab">
+            <div class="plot">
+                <h2>Nyquist Diagram</h2>
+                {% if plots.nyquist %}
+                <img src="data:image/png;base64,{{ plots.nyquist }}" style="width: 100%;">
+                {% else %}
+                <p>No Nyquist diagram data available. Run an analysis first.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-content" id="nichols-tab">
+            <div class="plot">
+                <h2>Nichols Chart</h2>
+                {% if plots.nichols %}
+                <img src="data:image/png;base64,{{ plots.nichols }}" style="width: 100%;">
+                {% else %}
+                <p>No Nichols chart data available. Run an analysis first.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-content" id="comparison-tab">
+            <h2>Controller Comparison</h2>
+            <form method="POST" id="comparison-form">
+            <div class="form-group">
+    <label>Gp(s) Numerator (for Comparison):</label>
+    <input type="text" name="compare_num" value="{{ values.compare_num or values.num }}" placeholder="e.g., 1 2 3">
+</div>
+
+<div class="form-group">
+    <label>Gp(s) Denominator (for Comparison):</label>
+    <input type="text" name="compare_den" value="{{ values.compare_den or values.den }}" placeholder="e.g., 1 4 5">
+</div>
+
+<div class="form-group">
+    <label>H(s) Numerator (for Comparison):</label>
+    <input type="text" name="compare_h_num" value="{{ values.compare_h_num or values.h_num }}" placeholder="e.g., 1">
+</div>
+
+<div class="form-group">
+    <label>H(s) Denominator (for Comparison):</label>
+    <input type="text" name="compare_h_den" value="{{ values.compare_h_den or values.h_den }}" placeholder="e.g., 1">
+</div>
+
+                <div class="controller-compare">
+                    <div class="controller-params" id="controller-1">
+                        <h3>Controller 1</h3>
+                        <select name="compare_type_1">
+                            <option value="PID" {{ 'selected' if values.compare_type_1 == "PID" else '' }}>PID</option>
+                            <option value="PIDA" {{ 'selected' if values.compare_type_1 == "PIDA" else '' }}>PIDA</option>
+                            <option value="OFF" {{ 'selected' if values.compare_type_1 == "OFF" else '' }}>Off</option>
+                        </select>
+                        <div class="controller-fields">
+                             <label for="compare_kp_1">Kp:</label>
+                             <input type="number" step="0.0001" name="compare_kp_1" placeholder="Kp" value="{{ values.compare_kp_1 or values.kp }}">
+                             <label for="compare_ki_1">Ki:</label>
+                             <input type="number" step="0.0001" name="compare_ki_1" placeholder="Ki" value="{{ values.compare_ki_1 or values.ki }}">
+                             <label for="compare_kd_1">Kd:</label>
+                             <input type="number" step="0.0001" name="compare_kd_1" placeholder="Kd" value="{{ values.compare_kd_1 or values.kd }}">
+                             <label for="compare_ka_1">Ka:</label>
+                             <input type="number" step="0.0001" name="compare_ka_1" placeholder="Ka" value="{{ values.compare_ka_1 or '0' }}">
+                        </div>
+                    </div>
+
+
+                    <div class="controller-params">
+                        <h3>Controller 2</h3>
+                        <select name="compare_type_2">
+                            <option value="PID" {{ 'selected' if values.compare_type_2 == "PID" else '' }}>PID</option>
+                            <option value="PIDA" {{ 'selected' if values.compare_type_2 == "PIDA" else '' }}>PIDA</option>
+                            <option value="OFF" {{ 'selected' if values.compare_type_1 == "OFF" else '' }}>Off</option>
+                        </select>
+                        <div class="controller-fields">
+                             <label for="compare_kp_2">Kp:</label>
+                             <input type="number" step="0.0001" name="compare_kp_2" placeholder="Kp" value="{{ values.compare_kp_2 or values.kp }}">
+                             <label for="compare_ki_2">Ki:</label>
+                             <input type="number" step="0.0001" name="compare_ki_2" placeholder="Ki" value="{{ values.compare_ki_2 or values.ki }}">
+                             <label for="compare_kd_2">Kd:</label>
+                             <input type="number" step="0.0001" name="compare_kd_2" placeholder="Kd" value="{{ values.compare_kd_2 or values.kd }}">
+                             <label for="compare_ka_2">Ka:</label>
+                             <input type="number" step="0.0001" name="compare_ka_2" placeholder="Ka" value="{{ values.compare_ka_2 or '0' }}">
+                        </div>
+                    </div>
+
+                    <div class="controller-params">
+                        <h3>Controller 3</h3>
+                        <select name="compare_type_3">
+                            <option value="PID" {{ 'selected' if values.compare_type_3 == "PID" else '' }}>PID</option>
+                            <option value="PIDA" {{ 'selected' if values.compare_type_3 == "PIDA" else '' }}>PIDA</option>
+                            <option value="OFF" {{ 'selected' if values.compare_type_1 == "OFF" else '' }}>Off</option>
+                        </select>
+                        <div class="controller-fields">
+                             <label for="compare_kp_3">Kp:</label>
+                             <input type="number" step="0.0001" name="compare_kp_3" placeholder="Kp" value="{{ values.compare_kp_3 or values.kp }}">
+                             <label for="compare_ki_3">Kp:</label>
+                             <input type="number" step="0.0001" name="compare_ki_3" placeholder="Ki" value="{{ values.compare_ki_3 or values.ki }}">
+                             <label for="compare_kd_3">Kd:</label>
+                             <input type="number" step="0.0001" name="compare_kd_3" placeholder="Kd" value="{{ values.compare_kd_3 or values.kd }}">
+                             <label for="compare_ka_3">Ka:</label>
+                             <input type="number" step="0.0001" name="compare_ka_3" placeholder="Ka" value="{{ values.compare_ka_3 or '0' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                   <button type="submit" name="action" value="compare_step">Compare Step Responses</button>
+                   <button type="submit" name="action" value="compare_bode">Compare Bode Diagrams</button>
+                </div>
+            </form>
+
+            {% if comparison_plot %}
+            <div class="plot-container" style="margin-top: 30px;">
+                <div class="plot">
+                    <h3>Comparison Results</h3>
+                    <img src="data:image/png;base64,{{ comparison_plot }}" style="width: 100%; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            </div>
+            {% endif %}
+
+            {% if performance_data %}
+            <div class="performance-container" style="margin-top: 20px;">
+                <h3>Performance Metrics</h3>
+                <table class="performance-table">
+                    <thead>
+                        <tr>
+                            {% for header in performance_data[0] %}
+                            <th>{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in performance_data[1:] %}
+                        <tr>
+                            {% for cell in row %}
+                            <td>{{ cell }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('controller_type').addEventListener('change', function() {
+    const kaField = document.getElementById('ka_input');
+    if (this.value === 'PID') {
+        kaField.disabled = true;
+        kaField.value = '0';
+    } else {
+        kaField.disabled = false;
+    }
+});
+
+function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-buttons button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    document.getElementById(tabName + '-tab').classList.add('active');
+    document.getElementById(tabName + '-tab-btn').classList.add('active');
+    window.location.hash = tabName;
+
+    if(tabName === 'comparison') {
+        updateControllerStates();
+    }
+}
+
+document.getElementById('compare-btn').addEventListener('click', function() {
+    showTab('comparison');
+});
+
+function toggleController(index, forceState = null) {
+    const container = document.querySelector(`[name="compare_type_${index}"]`).closest('.controller-params');
+    const select = container.querySelector('select');
+    const fields = container.querySelector('.controller-fields') || container;
+    const kaInput = container.querySelector(`[name="compare_ka_${index}"]`);
+    const allInputs = container.querySelectorAll('input[type="number"]');
+
+    if (!select.dataset.initialized) {
+        select.dataset.lastValidState = select.value;
+        select.dataset.initialized = "true";
+    }
+
+    if (forceState !== null) {
+        select.value = forceState;
+    }
+
+    if (select.value === 'OFF') {
+        fields.classList.add('disabled-fields');
+        allInputs.forEach(input => {
+            if (!input.dataset.prevValue && input.value) {
+                input.dataset.prevValue = input.value;
+            }
+            input.value = '';
+            input.disabled = true;
+            input.name = '';
+        });
+        select.dataset.lastValidState = 'OFF';
+    } else {
+
+        fields.classList.remove('disabled-fields');
+        allInputs.forEach(input => {
+            input.disabled = false;
+            input.name = input.dataset.originalName || `compare_${input.id.split('_').pop()}`;
+            if (input.dataset.prevValue) {
+                input.value = input.dataset.prevValue;
+            }
+        });
+
+        if (select.value === 'PID' && kaInput) {
+            kaInput.disabled = true;
+            kaInput.value = '0';
+        } else if (kaInput) {
+            kaInput.disabled = false;
+        }
+        select.dataset.lastValidState = select.value;
+    }
+}
+
+function updateControllerStates() {
+    document.querySelectorAll('[name^="compare_type_"]').forEach(select => {
+        const index = select.name.split('_')[2];
+        toggleController(index);
+    });
+}
+
+function handleFormSubmission(e) {
+    document.querySelectorAll('[name^="compare_type_"]').forEach(select => {
+        const index = select.name.split('_')[2];
+        const container = select.closest('.controller-params');
+        const inputs = container.querySelectorAll('input[type="number"]');
+
+        inputs.forEach(input => {
+            if (input.value && select.value !== 'OFF') {
+                input.dataset.prevValue = input.value;
+            }
+        });
+    });
+        document.querySelectorAll('[name^="compare_type_"][value="OFF"]').forEach(select => {
+        const index = select.name.split('_')[2];
+        const container = select.closest('.controller-params');
+        const inputs = container.querySelectorAll('input[type="number"]');
+
+        inputs.forEach(input => {
+            input.disabled = true;
+            input.name = '';
+        });
+    });
+
+    return true;
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    // Initialize original names for inputs
+    document.querySelectorAll('.controller-params input[type="number"]').forEach(input => {
+        input.dataset.originalName = input.name;
+    });
+
+    document.querySelectorAll('[name^="compare_type_"]').forEach(select => {
+        const index = select.name.split('_')[2];
+        select.addEventListener('change', () => toggleController(index));
+        toggleController(index);
+    });
+
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', handleFormSubmission);
+    });
+
+    const hash = window.location.hash.substring(1);
+    const validTabs = ['step', 'bode', 'pole_zero', 'root_locus', 'nyquist', 'nichols', 'comparison'];
+    if (hash && validTabs.includes(hash)) {
+        showTab(hash);
+    } else {
+        showTab('step');
+    }
+});
+    </script>
+</body>
+</html>
