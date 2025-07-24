@@ -69,28 +69,27 @@ def get_controller_response(controller_type, Gp, H, Kp, Ki, Kd, Ka=0):
 def generate_pid_step_response(sys_closed):
     fig, ax = plt.subplots(figsize=(8, 5))
     try:
-        t, y = step_response(sys_closed, T=np.linspace(0, 10, 1000))
+        t, y = step_response(sys_closed)
         ax.plot(t, y, linewidth=2.5, color='#1f77b4')
         ax.set_title('PID - Step Response')
         ax.grid(True)
 
         # Performans metrikleri
-        y_final = y[-1]
-        if y_final != 0:
-            rise_time = t[np.argmax(y >= 0.9 * y_final)] - t[np.argmax(y >= 0.1 * y_final)]
-            settling_idx = np.argmax((np.abs(y - y_final) <= 0.02 * y_final)[::-1])
-            settling_time = t[-settling_idx] if settling_idx != 0 else t[-1]
-            overshoot = (np.max(y) - y_final) / y_final * 100
-            steady_error = 1 - y[-1] / y_final
+        metric = ctrl.step_info(sys_closed)
 
-            metrics_text = (f"Rise Time: {rise_time:.4f} s\n"
-                            f"Settling Time: {settling_time:.4f} s\n"
-                            f"Overshoot: {overshoot:.2f}%\n"
-                            f"Steady Error: {steady_error:.4f}")
+        # Performans metriklerini yazdırmak istiyorsan bunu aktif et
+        metric_text = (
+            f"Rise time: {metric['RiseTime']:.4f} s\n"
+            f"Settling time: {metric['SettlingTime']:.4f} s\n"
+            f"Overshoot: {metric['Overshoot']:.2f}%\n"
+            f"Peak: {metric['Peak']:.4f}\n"
+            f"Peak time: {metric['PeakTime']:.4f} s\n"
+            f"Steady state value: {metric['SteadyStateValue']:.4f}"
+        )
 
-            ax.text(0.98, 0.02, metrics_text, transform=ax.transAxes,
-                    fontsize=9, bbox=dict(facecolor='white', alpha=0.8),
-                    verticalalignment='bottom', horizontalalignment='right')
+        ax.text(0.98, 0.02, metric_text, transform=ax.transAxes,
+                fontsize=9, bbox=dict(facecolor='white', alpha=0.8),
+                verticalalignment='bottom', horizontalalignment='right')
 
     except Exception as e:
         ax.text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center', color='red')
@@ -100,7 +99,6 @@ def generate_pid_step_response(sys_closed):
         buf.seek(0)
         plt.close(fig)
         return base64.b64encode(buf.read()).decode('utf-8')
-
 
 @thread_safe_control
 def generate_pid_bode_diagram(sys_open):
