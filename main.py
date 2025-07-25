@@ -743,14 +743,14 @@ def compare_controllers(Gp, H, controllers, plot_type):
     if plot_type == "step":
         performance_data.append(['Controller', 'Rise Time (s)', 'Settling Time (s)', 'Overshoot (%)', 'Steady State Error'])
     else:
-        performance_data.append(['Controller', 'Gain Margin (dB)', 'Phase Margin (°)', 'Gain Crossover (rad/s)',
-                                 'Phase Crossover (rad/s)'])
+        performance_data.append(['Controller', 'Gain Margin (dB)', 'Phase Margin (°)', 'Gain Crossover (rad/s)', 'Phase Crossover (rad/s)'])
 
     for i, (c_type, Kp, Ki, Kd, Ka) in enumerate(controllers):
         if c_type == "OFF":
             continue  # "OFF" durumundaki denetleyicileri atla
 
         try:
+            # Denetleyici transfer fonksiyonu
             if c_type == "PID":
                 C = ctrl.tf([Kd, Kp, Ki], [1, 0])
                 label = f"PID (Kp={Kp:.2f}, Ki={Ki:.2f}, Kd={Kd:.2f})"
@@ -762,15 +762,22 @@ def compare_controllers(Gp, H, controllers, plot_type):
 
             sys_open = C * Gp
             sys_closed = ctrl.feedback(sys_open, H)
+            info = step_info(sys_closed)
 
-            t, y = step_response(sys_closed)
-            y_final = np.mean(y[-100:])
+            # Settling time + 5 saniyelik buffer
+            sim_time = info['SettlingTime'] + 5
+            if np.isnan(sim_time) or sim_time <= 0:
+                sim_time = 20  # fallback time
 
-            rise_time = t[np.argmax(y >= 0.9 * y_final)] - t[np.argmax(y >= 0.1 * y_final)]
-            settling_idx = np.argmax((np.abs(y - y_final) <= 0.02 * y_final)[::-1])
-            settling_time = t[-settling_idx] if settling_idx != 0 else t[-1]
-            overshoot = (np.max(y) - y_final) / y_final * 100 if y_final != 0 else 0
-            steady_error = 1 - y[-1] / y_final if y_final != 0 else np.nan
+            # Zaman vektörü: Otomatik belirlenmiş
+            t = np.linspace(0, sim_time, 1000)
+            t, y = step_response(sys_closed, T=t)
+
+            # Final değer ve istatistikler
+            rise_time = info['RiseTime']
+            settling_time = info['SettlingTime']
+            overshoot = info['Overshoot']
+            steady_error = abs(1 - y[-1])  # daha mantıklı genelde
 
             if plot_type == "step":
                 ax.plot(t, y, color=colors[i], linewidth=2, label=label)
@@ -818,6 +825,7 @@ def compare_controllers(Gp, H, controllers, plot_type):
 
     plt.tight_layout()
     return plot_to_base64(fig), performance_data
+
 
 
 # Default değerleri global olarak tanımla (fonksiyon dışında)
