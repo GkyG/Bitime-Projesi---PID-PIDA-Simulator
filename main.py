@@ -755,7 +755,7 @@ def compare_controllers(Gp, H, controllers, plot_type):
                 C = ctrl.tf([Kd, Kp, Ki], [1, 0])
                 label = f"PID (Kp={Kp:.2f}, Ki={Ki:.2f}, Kd={Kd:.2f})"
             elif c_type == "PIDA":
-                C = ctrl.tf([Ka, Kd, Kp, Ki], [1, 0, 0])
+                C = ctrl.tf([Ka, Kd, Kp, Ki], [1, 0])
                 label = f"PIDA (Kp={Kp:.2f}, Ki={Ki:.2f}, Kd={Kd:.2f}, Ka={Ka:.2f})"
             else:
                 continue
